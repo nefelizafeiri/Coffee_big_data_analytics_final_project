@@ -1,158 +1,111 @@
-Coffee Shop Big Data Analytics — Final Project
-A data analytics project that examines coffee shop transaction records to improve customer experience, understand spending patterns, and build a targeting strategy for a customer rewards program.
+# Coffee Shop Big Data Analytics — Final Project
 
-Problem Statement
-This project analyzes a coffee shop's transaction data with three core goals:
+A PySpark-based analytics project examining ~500K coffee shop transactions to improve customer experience, understand spending patterns, and build a rewards program targeting strategy.
 
-Explore the data to identify patterns and trends in customer behavior.
-Model the factors that influence customer wait times and purchase amounts using regression analysis.
-Recommend operational improvements and develop strategies to target customers for the rewards program based on their spending habits and preferences.
-Dataset
-The dataset contains one row per transaction, with the following fields:
+---
 
-Column	Description
-transaction_id	Unique identifier for each transaction
-age	Age of the customer
-income	Income of the customer
-sex	Sex of the customer
-rewards_member	Whether the customer is enrolled in the rewards program
-occupation	Occupation of the customer
-num_items	Number of items purchased
-purchase_method	Payment method (e.g., cash, credit card)
-wait_time	Time spent waiting in line before the transaction (minutes)
-purchase_amount	Total transaction amount (USD)
-store_location	Store location where the transaction took place
-transaction_time	Hour of day when the transaction occurred
-day_of_week	Day of the week when the transaction occurred
-Project Objectives
-Perform exploratory data analysis (EDA) to uncover distributions, correlations, and anomalies.
-Build regression models to identify the key drivers of:
-Customer wait time
-Purchase amount
-Produce data visualizations that communicate findings clearly.
-Provide actionable recommendations for:
-Improving store operations and reducing wait times
-Enhancing the customer experience
-Targeting the right customers for the rewards program
-Methodology
-Data Cleaning — Handle missing values, outliers, and data type consistency.
-Exploratory Data Analysis — Summarize distributions and relationships across demographic, behavioral, and temporal variables.
-Feature Engineering — Encode categorical variables and prepare features for modeling.
-Regression Analysis — Fit and evaluate models predicting wait time and purchase amount.
-Segmentation & Targeting — Identify customer profiles most likely to benefit from or engage with the rewards program.
-Recommendations — Synthesize insights into concrete operational and marketing actions.
-Technologies Used
-Python (pandas, NumPy, scikit-learn, statsmodels)
-Data Visualization (Matplotlib, Seaborn)
-Jupyter Notebook
-Repository Structure
-Coffee_big_data_analytics_final_project/
-├── Coffee-Problem-Statement.pdf   # Original project brief
-└── README.md
-Getting Started
-Clone the repository:
+## Project Objectives
+
+1. **Wait Time** — Identify factors that drive customer wait time (regression).
+2. **Purchase Amount** — Identify factors that drive customer expenditure (regression).
+3. **Rewards Targeting** — Predict which non-members are most likely to join the rewards program (classification).
+
+Each target is modeled with a baseline plus ensemble alternatives (Random Forest, Gradient Boosted Trees). Operational recommendations follow from the best-performing model.
+
+---
+
+## Dataset
+
+The dataset contains one row per transaction across 13 columns:
+
+| Column | Type | Description |
+|---|---|---|
+| `transaction_id` | string | Unique transaction identifier |
+| `age` | int | Customer age |
+| `income` | string | Income bracket (Under $25K → Over $100K) |
+| `sex` | string | Customer sex |
+| `rewards_member` | bool | Whether the customer is in the rewards program |
+| `occupation` | string | Employed / Retired / Self Employed / Student |
+| `num_items` | int | Number of items purchased |
+| `purchase_method` | string | Cash / Credit Card / Mobile Payment |
+| `wait_time` | double | Minutes waiting in line |
+| `purchase_amount` | double | Total transaction amount (USD) |
+| `store_location` | string | Downtown / Midtown / Uptown |
+| `transaction_time` | int | Hour of day (6–23) |
+| `day_of_week` | string | Day of the week |
+
+> `coffee-Full.csv` is not included in the repository. The notebook auto-generates a synthetic dataset (502,313 rows) matching the original statistics on first run.
+
+---
+
+## Results Summary
+
+| Target | Best Model | Key Metric | Top Driver |
+|---|---|---|---|
+| Wait time | GBT Regressor | RMSE ≈ 1.25 min | `rewards_member`, `transaction_time` |
+| Purchase amount | GBT Regressor | R² ≈ 0.86 | `num_items`, `income` |
+| Rewards membership | Random Forest | AUC ≈ 0.956 | `wait_time`, `num_items`, `purchase_amount` |
+
+---
+
+## Key Findings
+
+- **Wait time** is driven by order size and hour of day — not demographics. Staff peak hours and offer a dedicated large-order lane to reduce bottlenecks.
+- **Purchase amount** is mechanically linked to `num_items` (r = 0.85). Bundle offers and upsells at point of sale are the highest-leverage revenue lever.
+- **Rewards targeting**: score all non-members with the classifier and market to the top decile — these are non-members whose transaction profile most closely resembles existing members.
+
+---
+
+## Methodology
+
+1. **Data Loading & Cleaning** — Type casting, null checks, dropping index columns.
+2. **EDA** — Descriptive stats, categorical frequencies, correlation matrix, conditional means, KMeans segmentation (4 clusters).
+3. **Feature Engineering** — Ordinal encoding for income, StringIndexer + OneHotEncoder for nominals, VectorAssembler.
+4. **Modeling** — 70/30 train/test split (seed=42). Three targets × three algorithms each.
+5. **Cross-Validation** — 3-fold CV with hyperparameter grid on the best wait-time model.
+
+---
+
+## Technologies
+
+- **PySpark 3.x / 4.x** — distributed processing, MLlib modeling
+- **Python** — pandas, NumPy, Matplotlib
+- **Jupyter Notebook**
+- **Java 11+** (required by Spark)
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+```bash
+pip install pyspark findspark numpy pandas matplotlib jupyter
+```
+
+Java 11 or later must be installed. On Ubuntu/Debian:
+
+```bash
+sudo apt-get install openjdk-11-jdk
+```
+
+### Run
+
+```bash
 git clone https://github.com/nefelizafeiri/Coffee_big_data_analytics_final_project.git
 cd Coffee_big_data_analytics_final_project
-Install dependencies:
-pip install pandas numpy scikit-learn statsmodels matplotlib seaborn jupyter
-Launch Jupyter Notebook and open the analysis notebook:
-jupyter notebook
-The stop hook will keep showing this until the commit is pushed — there's nothing I can do to silence it from my side.
+jupyter notebook Coffee_Final_Project.ipynb
+```
 
-Go to your repository on GitHub → click README.md → click the pencil icon to edit → paste the markdown I gave you → commit directly on main. That bypasses the git push entirely.
+Run all cells. If `coffee-Full.csv` is not present, the notebook generates a synthetic dataset automatically on the first cell run.
 
-but in a markdown file or just to copy...
-
-Just copy the text I gave — no file needed. Go to:
-
-https://github.com/nefelizafeiri/Coffee_big_data_analytics_final_project/edit/main/README.md
-
-Select all the existing text, paste the markdown I gave you, then click Commit changes.
-
-Still the same unpushed commit. Did the GitHub edit work? If you committed via the web interface, let me check if it went through.
-
-Used get file contents
-The README on GitHub is still the old one-liner — the web edit hasn't been done yet.
-
-Go to this URL, select all, paste, and commit:
-
-https://github.com/nefelizafeiri/Coffee_big_data_analytics_final_project/edit/main/README.md
-
-# Coffee_big_data_analytics_final_project it only has this!!! fix it without any mistakes
-
-Used create or update file
-I still can't write to GitHub from this session — both git and the API return 403. Here's exactly what to do in the GitHub web editor:
-
-Go to https://github.com/nefelizafeiri/Coffee_big_data_analytics_final_project/edit/main/README.md
-Press Ctrl+A to select everything
-Press Delete
-Paste the text below
-Scroll down and click Commit changes
-Copy everything between the lines:
-
-# Coffee Shop Big Data Analytics — Final Project
-A data analytics project that examines coffee shop transaction records to improve customer experience, understand spending patterns, and build a targeting strategy for a customer rewards program.
 ---
-## Problem Statement
-This project analyzes a coffee shop's transaction data with three core goals:
-1. **Explore** the data to identify patterns and trends in customer behavior.
-2. **Model** the factors that influence customer wait times and purchase amounts using regression analysis.
-3. **Recommend** operational improvements and develop strategies to target customers for the rewards program based on their spending habits and preferences.
----
-## Dataset
-The dataset contains one row per transaction, with the following fields:
-| Column | Description |
-|---|---|
-| `transaction_id` | Unique identifier for each transaction |
-| `age` | Age of the customer |
-| `income` | Income of the customer |
-| `sex` | Sex of the customer |
-| `rewards_member` | Whether the customer is enrolled in the rewards program |
-| `occupation` | Occupation of the customer |
-| `num_items` | Number of items purchased |
-| `purchase_method` | Payment method (e.g., cash, credit card) |
-| `wait_time` | Time spent waiting in line before the transaction (minutes) |
-| `purchase_amount` | Total transaction amount (USD) |
-| `store_location` | Store location where the transaction took place |
-| `transaction_time` | Hour of day when the transaction occurred |
-| `day_of_week` | Day of the week when the transaction occurred |
----
-## Project Objectives
-- Perform **exploratory data analysis (EDA)** to uncover distributions, correlations, and anomalies.
-- Build **regression models** to identify the key drivers of:
-  - Customer wait time
-  - Purchase amount
-- Produce **data visualizations** that communicate findings clearly.
-- Provide **actionable recommendations** for:
-  - Improving store operations and reducing wait times
-  - Enhancing the customer experience
-  - Targeting the right customers for the rewards program
----
-## Methodology
-1. **Data Cleaning** — Handle missing values, outliers, and data type consistency.
-2. **Exploratory Data Analysis** — Summarize distributions and relationships across demographic, behavioral, and temporal variables.
-3. **Feature Engineering** — Encode categorical variables and prepare features for modeling.
-4. **Regression Analysis** — Fit and evaluate models predicting wait time and purchase amount.
-5. **Segmentation & Targeting** — Identify customer profiles most likely to benefit from or engage with the rewards program.
-6. **Recommendations** — Synthesize insights into concrete operational and marketing actions.
----
-## Technologies Used
-- **Python** (pandas, NumPy, scikit-learn, statsmodels)
-- **Data Visualization** (Matplotlib, Seaborn)
-- **Jupyter Notebook**
----
+
 ## Repository Structure
+
+```
 Coffee_big_data_analytics_final_project/
+├── Coffee_Final_Project.ipynb   # Main analysis notebook
 ├── Coffee-Problem-Statement.pdf # Original project brief
 └── README.md
-
----
-## Getting Started
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/nefelizafeiri/Coffee_big_data_analytics_final_project.git
-   cd Coffee_big_data_analytics_final_project
-Install dependencies:
-pip install pandas numpy scikit-learn statsmodels matplotlib seaborn jupyter
-Launch Jupyter Notebook and open the analysis notebook:
-jupyter notebook
+```
