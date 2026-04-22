@@ -60,6 +60,10 @@ XGBoost tuned with Optuna reaches **RMSE 1.44 min, R² 0.337** on test.
 
 ### R² caps at 0.34 — data ceiling, not a model bug
 
+![Wait time residuals](images/wait_time_residuals.png)
+
+Residuals are symmetric and centered on zero — the model is unbiased. The variance that remains isn't wrong; it simply isn't in the data.
+
 | Experiment | Test R² |
 |---|---|
 | XGB baseline, no interactions, 25 trials | 0.337 |
@@ -85,6 +89,7 @@ XGBoost reaches **RMSE $3.16, R² 0.862**. Baseline Linear Regression already hi
 
 **AUC 0.979, Accuracy 0.921, F1 0.889** on test.
 
+![ROC curve](images/rewards_roc.png)
 ![Confusion Matrix](images/rewards_confusion_matrix.png)
 ![SHAP Rewards — Bar](images/shap_rewards_bar.png)
 ![SHAP Rewards — Beeswarm](images/shap_rewards_beeswarm.png)
