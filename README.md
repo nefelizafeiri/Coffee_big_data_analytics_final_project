@@ -1,14 +1,12 @@
 # Coffee Shop Big Data Analytics — Final Project
 
-A PySpark-based analytics project that examines coffee-shop transaction records to improve customer experience, understand spending patterns, and build a targeting strategy for a customer-rewards program.
+A hybrid **PySpark + scikit-learn / XGBoost / Optuna / SHAP** analytics project that examines ~1.8M coffee-shop transactions to improve operations, understand spend drivers, and build a rewards-program targeting strategy.
 
 ## Problem Statement
 
-This project analyzes a coffee shop's transaction data with three core goals:
-
-1. **Explore** the data to identify patterns and trends in customer behavior.
-2. **Model** the factors that influence customer wait times and purchase amounts using regression analysis.
-3. **Recommend** operational improvements and develop a strategy for targeting non-members for the rewards program.
+1. **Explore** customer behavior patterns and trends.
+2. **Model** the drivers of customer wait time and purchase amount (regression).
+3. **Classify** rewards-program members to build a targeting strategy for non-members.
 
 ## Dataset
 
@@ -16,52 +14,44 @@ One row per transaction, ~1.8M rows, 13 columns:
 
 | Column | Description |
 |---|---|
-| `transaction_id` | Unique identifier for each transaction |
-| `age` | Age of the customer |
-| `income` | Income bracket of the customer |
-| `sex` | Sex of the customer |
-| `rewards_member` | Whether the customer is enrolled in the rewards program |
-| `occupation` | Occupation of the customer |
-| `num_items` | Number of items purchased |
-| `purchase_method` | Payment method (cash, credit card, etc.) |
-| `wait_time` | Time spent waiting before the transaction (minutes) |
-| `purchase_amount` | Total transaction amount (USD) |
-| `store_location` | Store location where the transaction took place |
-| `transaction_time` | Hour of day the transaction occurred |
-| `day_of_week` | Day of the week the transaction occurred |
+| `transaction_id` | Unique identifier |
+| `age` | Customer age |
+| `income` | Income bracket |
+| `sex` | Customer sex |
+| `rewards_member` | Enrolled in rewards program (TRUE/FALSE) |
+| `occupation` | Customer occupation |
+| `num_items` | Items purchased |
+| `purchase_method` | Payment method |
+| `wait_time` | Wait time in minutes |
+| `purchase_amount` | Transaction amount (USD) |
+| `store_location` | Store |
+| `transaction_time` | Hour of day |
+| `day_of_week` | Day of the week |
 
-## Project Objectives
+## ML Workflow (best practices applied)
 
-- Perform **exploratory data analysis (EDA)** to uncover distributions, correlations and anomalies.
-- Build **regression models** to identify the key drivers of:
-  - Customer wait time
-  - Purchase amount
-- Build a **classification model** that scores non-members for rewards-program targeting.
-- Produce **data visualizations** that communicate findings clearly.
-- Provide **actionable recommendations** for operations, revenue and customer acquisition.
+1. **Data cleaning** — PySpark ingest, null and duplicate checks, type casting.
+2. **EDA** — numeric stats, categorical frequencies, distributions, correlation heatmap, wait-time / spend breakdowns, KMeans segmentation.
+3. **Feature engineering** — ordinal `income`, one-hot nominals, derived `is_peak_hour` and `is_weekend`.
+4. **Feature selection** — Variance Threshold + F-score + Mutual Information + RFE (Random Forest).
+5. **Train / Validation / Test split** — 70/15/15, stratified for classification.
+6. **Model zoo** — baseline Linear/Logistic Regression + tuned Random Forest + tuned GBM + tuned XGBoost.
+7. **Hyperparameter search** — `GridSearchCV` (coarse) and **Optuna** TPE (fine, Bayesian) with early stopping.
+8. **Final predictions** — refit on train+val, scored once on the held-out test set (honest generalization).
+9. **SHAP explainability** — global (bar, beeswarm), local (waterfall), dependence plots.
+10. **Recommendations** — operational, revenue, and targeting actions tied back to SHAP evidence.
 
-## Methodology
+## Technologies
 
-1. **Data Cleaning** — drop index and identifier columns, cast `rewards_member` to 0/1, check missingness.
-2. **Exploratory Data Analysis** — numeric summaries, categorical frequencies, sampled distribution plots, correlation heatmap, wait-time and spend breakdowns by store/hour/demographic, KMeans segmentation.
-3. **Feature Engineering** — ordinal encoding of income, `StringIndexer` + `OneHotEncoder` for nominals, shared `VectorAssembler` feature spaces.
-4. **Regression Analysis** — Linear Regression, Random Forest Regressor, GBT Regressor for both `wait_time` and `purchase_amount`.
-5. **Rewards Classifier** — Logistic Regression and Random Forest Classifier, ranked by AUC; top-decile scoring on non-members drives the targeting list.
-6. **Cross-Validation** — 3-fold CV on the winning wait-time model as a sanity check.
-7. **Findings & Recommendations** — operational, revenue and targeting actions tied back to model evidence.
-
-## Technologies Used
-
-- **PySpark 3.5** — DataFrames + MLlib (runs locally, portable to a cluster)
-- **pandas / NumPy** — small post-aggregation analysis
-- **Matplotlib / Seaborn** — visualizations
-- **Jupyter Notebook**
+- **PySpark 3.5** — big-data ingest, EDA, segmentation.
+- **scikit-learn 1.4**, **XGBoost 2.0**, **Optuna 3.6**, **SHAP 0.45** — modeling and explainability.
+- **pandas / NumPy / matplotlib / seaborn** — analysis and visualization.
 
 ## Repository Structure
 
 ```
 Coffee_big_data_analytics_final_project/
-├── Coffee_Final_Project.ipynb     # Full PySpark analysis notebook
+├── Coffee_Final_Project.ipynb     # Full analysis notebook (EDA + ML + SHAP)
 ├── Coffee-Problem-Statement.pdf   # Original project brief
 └── README.md
 ```
@@ -72,21 +62,20 @@ Coffee_big_data_analytics_final_project/
 git clone https://github.com/nefelizafeiri/Coffee_big_data_analytics_final_project.git
 cd Coffee_big_data_analytics_final_project
 
-pip install pyspark==3.5.1 pandas numpy matplotlib seaborn jupyter
+pip install pyspark==3.5.1 pandas numpy matplotlib seaborn \
+    scikit-learn==1.4.2 xgboost==2.0.3 optuna==3.6.1 shap==0.45.0 jupyter
 
 jupyter notebook Coffee_Final_Project.ipynb
 ```
 
-Before running, set the `DATA_PATH` variable in the **Load Data** section to point at your local copy of `coffee-Full.csv`. The default in the notebook is `/Users/danielregalado/Desktop/coffee-Full.csv`.
-
-Java 8/11/17 must be installed for PySpark to start a local `SparkSession`.
+Set `DATA_PATH` in section 2 to the local location of `coffee-Full.csv` (default: `/Users/danielregalado/Desktop/coffee-Full.csv`). Java 8/11/17 is required for PySpark.
 
 ## Results at a Glance
 
-| Target | Best Model | Headline Metric | Dominant Driver |
+| Target | Best Model | Test Metric | Top-2 SHAP Features |
 |---|---|---|---|
-| Wait time       | see §5.4 table | RMSE (min) | `num_items`, `transaction_time` |
-| Purchase amount | see §6 table   | RMSE (USD) | `num_items`, income, occupation |
-| Rewards member  | see §7.3 table | AUC        | `purchase_amount`, `num_items`, store/time |
+| Wait time       | see §7.4 | RMSE (min) | `num_items`, `is_peak_hour` |
+| Purchase amount | see §8.4 | RMSE (USD) | `num_items`, `income_ord`   |
+| Rewards member  | see §9.3 | AUC        | `purchase_amount`, `num_items` |
 
-See §9 of the notebook for the full set of operational, revenue and rewards-targeting recommendations.
+See §10 of the notebook for the full set of operational, revenue and rewards-targeting recommendations, each grounded in SHAP evidence.
