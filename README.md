@@ -1,150 +1,119 @@
-# Coffee Shop Big Data Analytics — Final Project
+# Coffee Shop Big Data Analytics
 
-A hybrid **PySpark + scikit-learn / XGBoost / Optuna / SHAP** analytics project that examines ~1.8M coffee-shop transactions to improve operations, understand spend drivers, and build a rewards-program targeting strategy.
+End-to-end big-data ML project on **~1.8M coffee-shop transactions**. PySpark handles ingest, cleaning and EDA; scikit-learn + XGBoost + Optuna do the modeling; SHAP explains every prediction.
 
----
-
-## Problem Statement
-
-1. **Explore** customer behavior patterns and trends.
-2. **Model** the drivers of customer wait time and purchase amount (regression).
-3. **Classify** rewards-program members to build a targeting strategy for non-members.
-
-## Dataset
-
-One row per transaction, ~1.8M rows, 13 columns: customer demographics (`age`, `income`, `sex`, `occupation`), transaction details (`num_items`, `purchase_method`, `wait_time`, `purchase_amount`), and context (`store_location`, `transaction_time`, `day_of_week`, `rewards_member`).
-
----
-
-## Results at a Glance — Test-Set Performance
+> **Results (held-out test set):**
+> `wait_time` RMSE 1.44 min · `purchase_amount` R² 0.86 · `rewards_member` AUC 0.98
 
 ![Test Metrics](images/metrics_summary.png)
 
-| Target | Best Model | Test Metric | Status |
-|---|---|---|---|
-| `wait_time` | XGBoost (Optuna) | RMSE **1.44 min**, R² **0.337** | Data ceiling — §7.6 |
-| `purchase_amount` | XGBoost (Optuna) | RMSE **$3.16**, R² **0.862** | Strong |
-| `rewards_member` | XGBoost (Optuna) | AUC **0.979**, F1 **0.889** | Excellent |
-
-Metrics measured on the held-out test split (15% of a stratified 300k sample, seed=42).
-
 ---
 
-## ML Workflow (best practices applied)
+## The three questions
 
-1. **Data cleaning** (PySpark) — ingest, null / duplicate checks, type casting.
-2. **EDA** — numeric stats, categorical frequencies, distributions, correlations, temporal patterns, KMeans segmentation.
-3. **Feature engineering** — ordinal `income`, one-hot nominals, **interaction features** (`items_x_hour`, `items_x_peak`, `items_sq`), cyclic hour encoding (`hour_sin`, `hour_cos`).
-4. **Feature selection** — VarianceThreshold + F-score + Mutual Information + RFE (union of top-20).
-5. **Train / Validation / Test split** — 70 / 15 / 15, stratified for classification.
-6. **Model zoo** — Linear/Logistic Regression baselines + Random Forest + Gradient Boosting + XGBoost.
-7. **Hyperparameter search** — `GridSearchCV` (coarse) **and** Optuna TPE (fine, Bayesian, 40 trials) with early stopping.
-8. **Final predictions** — refit on train+val, scored **once** on the held-out test set.
-9. **SHAP explainability** — global (bar, beeswarm), local (waterfall), dependence.
-10. **Recommendations** — grounded in SHAP evidence.
+1. **Operations** — what drives customer wait time?
+2. **Revenue** — what drives purchase amount?
+3. **Marketing** — which non-members are the best rewards-program targets?
+
+## ML workflow
+
+PySpark → pandas handoff, then a full best-practices pipeline:
+
+- **EDA** on the full 1.8M rows in Spark.
+- **Feature engineering** — ordinal income, one-hot nominals, cyclic hour (`hour_sin/cos`), interactions (`items_x_hour`, `items_x_peak`, `items_sq`), `is_peak_hour`, `is_weekend`.
+- **Feature selection** — VarianceThreshold ∪ F-score ∪ Mutual Information ∪ RFE.
+- **Split** — 70 / 15 / 15, stratified for classification, train→val→test with no leakage.
+- **Hyperparameter search** — GridSearchCV (coarse) + Optuna TPE (Bayesian, 40 trials, early stopping).
+- **Final evaluation** — refit on train+val, scored **once** on the held-out test set.
+- **SHAP** — global bar & beeswarm + local waterfall explanations.
 
 ---
 
 ## Exploratory Data Analysis
 
-### Numeric feature distributions
-![EDA — Distributions](images/eda_distributions.png)
+Numeric distributions of the five quantitative fields (sampled for plotting):
 
-### Correlation matrix
-![EDA — Correlation](images/eda_correlation.png)
+![Distributions](images/eda_distributions.png)
 
-Strongest correlation: `num_items ↔ purchase_amount` (mechanical — more items, bigger ticket) and `num_items ↔ wait_time` (bigger orders queue longer).
+Correlations — `num_items` is the single strongest driver of both targets:
 
-### Average wait time by hour of day
-![EDA — Wait by Hour](images/eda_wait_by_hour.png)
+![Correlation](images/eda_correlation.png)
 
-Clear peak-hour bumps at 7-10 AM and 3-5 PM → motivates the `is_peak_hour` feature.
+Wait time spikes during the 7–10 AM and 3–5 PM rushes, motivating `is_peak_hour`:
 
-### Average purchase amount by income
-![EDA — Spend by Income](images/eda_spend_by_income.png)
+![Wait by hour](images/eda_wait_by_hour.png)
 
-Monotonic lift in spend across income brackets → supports ordinal encoding of `income`.
+Spend rises monotonically with income band, supporting ordinal encoding:
+
+![Spend by income](images/eda_spend_by_income.png)
 
 ---
 
-## Model 1 — Wait Time (Regression)
+## Model 1 — Wait Time
 
-Baseline Linear Regression reaches R² ≈ 0.25 on validation. XGBoost tuned with Optuna reaches **R² 0.337** on test.
+XGBoost tuned with Optuna reaches **RMSE 1.44 min, R² 0.337** on test.
 
-### SHAP — Global importance
 ![SHAP Wait Time — Bar](images/shap_wait_time_bar.png)
-
-### SHAP — Beeswarm (direction + magnitude per transaction)
 ![SHAP Wait Time — Beeswarm](images/shap_wait_time_beeswarm.png)
 
-**Reading.** `num_items`, `items_x_hour`, and `is_peak_hour` dominate the wait model. Demographics contribute near-zero SHAP — wait time is operational, not demographic.
+`num_items`, `items_x_hour` and `is_peak_hour` dominate. Demographics contribute near-zero SHAP — **wait time is an operational problem, not a demographic one.**
 
-### Why R² caps at 0.337 — data ceiling, not model bug
+### R² caps at 0.34 — data ceiling, not a model bug
 
-| Experiment | Val RMSE | Test R² |
-|---|---|---|
-| XGB baseline (no interactions, 25 trials) | 1.43 | **0.337** |
-| + interaction feats + cyclic hour + 60 trials | 1.44 | **0.337** |
-| + log(1+y) target transform | 1.46 | worse |
+| Experiment | Test R² |
+|---|---|
+| XGB baseline, no interactions, 25 trials | 0.337 |
+| + interactions + cyclic hour + 60 trials | 0.337 |
+| + log(1+y) target transform | worse |
 
-We pushed this target hard — **the ~66% unexplained variance is irreducible** given the columns available. To move the needle in future work, collect `barista_id`, `queue_length_at_order`, and item-level detail.
+~66% unexplained variance is **irreducible** given the available columns. To break the ceiling, collect `barista_id`, `queue_length_at_order`, and item-level detail (espresso drink vs. pastry).
 
 ---
 
-## Model 2 — Purchase Amount (Regression)
+## Model 2 — Purchase Amount
 
-Baseline LR already reaches R² ≈ 0.77 (largely linear structure). XGBoost tuned with Optuna reaches **R² 0.862** on test (RMSE $3.16).
+XGBoost reaches **RMSE $3.16, R² 0.862**. Baseline Linear Regression already hits R² 0.77 — the structure is largely linear.
 
-### SHAP — Global importance
 ![SHAP Purchase Amount — Bar](images/shap_purchase_amount_bar.png)
-
-### SHAP — Beeswarm
 ![SHAP Purchase Amount — Beeswarm](images/shap_purchase_amount_beeswarm.png)
 
-**Reading.** `num_items` dominates (mechanical), followed by `income_ord` and occupation / purchase-method indicators. Because LR is within ~4% R² of XGBoost, a simple linear model is deployable in a lightweight POS-side scoring service.
+`num_items` dominates (mechanical — more items, bigger ticket); `income_ord`, occupation and purchase method contribute secondary effects. Because LR is within ~4 % R² of XGBoost, a simple linear model can be deployed POS-side.
 
 ---
 
 ## Model 3 — Rewards Classifier
 
-XGBoost Optuna-tuned reaches **AUC 0.979, Accuracy 0.921, F1 0.889** on test.
+**AUC 0.979, Accuracy 0.921, F1 0.889** on test.
 
-### Confusion matrix
-![Rewards — Confusion Matrix](images/rewards_confusion_matrix.png)
-
-### SHAP — Global importance
+![Confusion Matrix](images/rewards_confusion_matrix.png)
 ![SHAP Rewards — Bar](images/shap_rewards_bar.png)
-
-### SHAP — Beeswarm
 ![SHAP Rewards — Beeswarm](images/shap_rewards_beeswarm.png)
 
-**Reading.** `purchase_amount` and `num_items` dominate — members behave differently at the till. The targeting pipeline scores non-members, ranks by `P(member)`, and markets to the top decile.
+Members behave differently at the till: `purchase_amount` and `num_items` dominate. The targeting workflow scores every non-member, ranks by `P(member)`, and markets to the **top decile** — non-members who already behave like members.
 
 ---
 
 ## Business Recommendations
 
-### Wait time (operational)
-1. Staff up during 7-10 AM and 3-5 PM peak hours where SHAP shows the largest positive wait contributions.
-2. Build a ≤2-item express lane — small orders carry near-zero SHAP wait signal and should never queue behind complex ones.
-3. Track wait time per store × hour as an SLA KPI.
+**Operations (wait time)**
+- Staff up during 7–10 AM and 3–5 PM peaks.
+- Build a ≤ 2-item express lane — small orders carry near-zero SHAP wait signal.
+- Track wait per store × hour as an SLA KPI.
 
-### Purchase amount (revenue)
-1. Push **bundle promotions** that shift `num_items` upward — the biggest per-ticket lever.
-2. Tailor upsell prompts to high-income-band segments where SHAP shows positive spend contribution.
-3. Deploy LR (not XGBoost) for online scoring — within a few % R² and far cheaper.
+**Revenue (purchase amount)**
+- Push **bundle promotions** — `num_items` is the biggest per-ticket lever.
+- Tailor upsell prompts by income band where SHAP shows positive spend contribution.
+- Deploy LR (not XGBoost) for online scoring — within a few % R² at a fraction of the cost.
 
-### Rewards targeting
-1. Score every non-member transaction with the trained XGBoost classifier.
-2. Market to the **top decile** of `P(member)` — non-members who already behave like members.
-3. Use SHAP waterfall plots to **personalize the pitch** (e.g. "you spend like our members during weekend mornings").
+**Marketing (rewards)**
+- Score every non-member transaction; rank by `P(member)`; market to the top decile.
+- Use SHAP waterfall plots to personalize pitches ("you spend like our members during weekend mornings").
 
 ---
 
 ## Repository Structure
 
 ```
-Coffee_big_data_analytics_final_project/
 ├── Coffee_Final_Project.ipynb     # Full analysis notebook (EDA + ML + SHAP)
 ├── Coffee-Problem-Statement.pdf   # Original project brief
 ├── images/                        # Figures used in this README
@@ -165,6 +134,6 @@ jupyter notebook Coffee_Final_Project.ipynb
 
 Set `DATA_PATH` in section 2 to your local `coffee-Full.csv`. Java 8/11/17 is required for PySpark.
 
-## Technologies
+## Stack
 
-PySpark 3.5+ · scikit-learn 1.7 · XGBoost 3.0 · Optuna 4.6 · SHAP 0.50 · pandas / NumPy / matplotlib / seaborn
+PySpark 3.5+ · scikit-learn 1.7 · XGBoost 3.0 · Optuna 4.6 · SHAP 0.50 · pandas · matplotlib · seaborn
