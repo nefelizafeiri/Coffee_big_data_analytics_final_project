@@ -2,10 +2,13 @@
 
 End-to-end big-data ML project on **~1.8M coffee-shop transactions**. PySpark handles ingest, cleaning and EDA; scikit-learn + XGBoost + Optuna do the modeling; SHAP explains every prediction.
 
-> **Results (held-out test set):**
-> `wait_time` RMSE 1.44 min · `purchase_amount` R² 0.86 · `rewards_member` AUC 0.98
+### Results on the held-out test set
 
-![Test Metrics](images/metrics_summary.png)
+| Target             | Task           | Baseline        | Final (XGBoost + Optuna) | Improvement |
+|--------------------|----------------|-----------------|--------------------------|-------------|
+| `wait_time`        | Regression     | R² 0.25         | **R² 0.34**, RMSE 1.44 min | +34.8 %     |
+| `purchase_amount`  | Regression     | R² 0.77         | **R² 0.86**, RMSE $3.16    | +11.8 %     |
+| `rewards_member`   | Classification | AUC 0.95        | **AUC 0.98**, F1 0.89      | +2.9 %      |
 
 ---
 
